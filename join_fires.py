@@ -37,19 +37,34 @@ class Incendio:
 		self.tam = 1
 		self.inicio = fecha
 		self.fin = fecha
+		self.lista_latlon=list()
+		self.prom_lat = -1
+		self.prom_lon = -1
+
+	def promediar_latlons(self):
+		if self.prom_lat == -1 and self.prom_lon == -1:
+			lats, lons = zip(*self.lista_latlon)
+			self.prom_lat = sum(lats)/len(lats)
+			self.prom_lon = sum(lons)/len(lons)
+		
 	def lista_nombres(self):
 		return [
 			"incendio_id",
 			"incendio_tam",
 			"incendio_inicio",
-			"incendio_fin"
+			"incendio_fin",
+			"incendio_centro_lat",
+			"incendio_centro_lon"
 		]
 	def lista(self):
+		self.promediar_latlons()
 		return [
 			self.id,
 			self.tam,
 			self.inicio,
-			self.fin
+			self.fin,
+			self.prom_lat,
+			self.prom_lon
 		]
 class Foco:
 	def __init__(self,f_id,lat,lon,fecha):
@@ -126,12 +141,13 @@ class Difusion:
 			for j in xrange(i,len(focos_hoy)):
 				if focos_hoy[i].es_ady(focos_hoy[j]):
 					self.uf_fuegos.union(focos_hoy[i].id,focos_hoy[j].id)
-
 	def calc_estadisticas(self):
 		for foco in self.focos:
 			if foco.id != foco.grupo.id:
 				foco.grupo.tam+=1
+			foco.grupo.lista_latlon.append((foco.lat,foco.lon))
 			foco.grupo.fin=foco.fecha
+
 	def correr(self):
 		if len(self.dias) == 0: self._cargar_estructuras()
 		i=1;n=len(self.dias);prev=self.dias[0]
