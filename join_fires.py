@@ -2,8 +2,12 @@
 from __future__ import division
 import datetime
 import csv
+from scipy.spatial import ConvexHull
+from scipy.spatial.qhull import QhullError
+import numpy as np
 from math import asin,sqrt,sin,cos,pi
 from UnionFind import UnionFind
+import sys, os
 
 #hay varios de la misma? => parece ser que no
 
@@ -32,24 +36,64 @@ def haversine(lat1,lon1,lat2,lon2):
 #pero la referencia es en sentido foco->incendio
 #i.e., cada foco sabe a que incendio pertenece.
 class Incendio:
-	def __init__(self,g_id,fecha):
+	def __init__(self,g_id,fecha,poss):
 		self.id = g_id
 		self.tam = 1
 		self.inicio = fecha
 		self.fin = fecha
+		self.posiciones = poss
+		self._cache_perimetro = None
+		self._cache_perim_n = None
+	
+	def _calcular_perimetro(self):
+		#calcula el perimetro a traves del casco convexo de los puntos.
+		#actualmente perimetro = sum(dist(centroides)), no tiene en cuenta los bordes de las celdas.
+		#tiene un cache just in case para no calcularlo dos veces.
+		if (self._cache_perimetro is not None) and (self._cache_perim_n == len(self.posiciones)):
+			#si, falla cuando calculas perimetro, borras y agregas un elemento distinto, calc. de nuevo
+			#en este flujo no sucede // si se cambia, hay que agregar una revision distinta (e.g. md5)
+			return self._cache_perimetro
+
+		perimetro = 0
+		puntos = np.array(self.posiciones)
+
+		#caso trivial: no hay suficientes puntos
+		if len(self.posiciones) < 3:
+			for i in xrange(1,puntos.shape[0]):
+				perimetro += np.linalg.norm(puntos[i]-puntos[i-1])
+			self._cache_perimetro = perimetro
+			self._cache_perim_n = len(self.posiciones)
+			return perimetro
+		#QJ=si son coplanares, este parametro los mueve un cachito para que los encuentre
+		#Pp=no imprimir errores de precision
+		hull = ConvexHull(puntos, qhull_options='QJ Pp')
+		#los vertices estan ordenados ya
+		for i in xrange(1, hull.vertices.shape[0]):
+			perimetro+= np.linalg.norm(puntos[hull.vertices[i]]-puntos[hull.vertices[i-1]])
+		#wrap-around
+		perimetro+=np.linalg.norm(
+			puntos[hull.vertices[hull.vertices.shape[0]-1]]
+			- puntos[hull.vertices[0]]
+		)
+		self._cache_perimetro = perimetro
+		self._cache_perim_n = len(self.posiciones)
+		return perimetro
+
 	def lista_nombres(self):
 		return [
 			"incendio_id",
 			"incendio_tam",
 			"incendio_inicio",
-			"incendio_fin"
+			"incendio_fin",
+			"perimetro"
 		]
 	def lista(self):
 		return [
 			self.id,
 			self.tam,
 			self.inicio,
-			self.fin
+			self.fin,
+			self._calcular_perimetro()
 		]
 class Foco:
 	def __init__(self,f_id,lat,lon,fecha):
@@ -57,8 +101,9 @@ class Foco:
 		self.lat = lat
 		self.lon = lon
 		self.fecha = fecha
-		self.grupo = Incendio(self.id,self.fecha)
-	
+		self.grupo = Incendio(self.id,self.fecha, [self.obtener_pos()])
+	def obtener_pos(self):
+		return [self.lon, self.lat]
 	def es_ady(self,otro,corte=CORTE_DIST_HAVERSINE):
 		return haversine(
 			self.lat,self.lon,
@@ -89,7 +134,6 @@ def crear_foco(diccionario):
 		float(diccionario["LONGITUDE"]),
 		datetime.datetime.strptime(diccionario["ACQ_DATE"],"%m/%d/%Y")
 	)
-
 
 class Difusion:
 	def __init__(self):
@@ -131,6 +175,7 @@ class Difusion:
 		for foco in self.focos:
 			if foco.id != foco.grupo.id:
 				foco.grupo.tam+=1
+				foco.grupo.posiciones.append(foco.obtener_pos())
 			foco.grupo.fin=foco.fecha
 	def correr(self):
 		if len(self.dias) == 0: self._cargar_estructuras()
