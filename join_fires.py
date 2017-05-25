@@ -44,6 +44,9 @@ class Incendio:
 		self.posiciones = poss
 		self._cache_perimetro = None
 		self._cache_perim_n = None
+		self.lista_latlon=list()
+		self.prom_lat = -1
+		self.prom_lon = -1
 	
 	def _calcular_perimetro(self):
 		#calcula el perimetro a traves del casco convexo de los puntos.
@@ -79,20 +82,32 @@ class Incendio:
 		self._cache_perim_n = len(self.posiciones)
 		return perimetro
 
+
+	def promediar_latlons(self):
+		if self.prom_lat == -1 and self.prom_lon == -1:
+			lats, lons = zip(*self.lista_latlon)
+			self.prom_lat = sum(lats)/len(lats)
+			self.prom_lon = sum(lons)/len(lons)
+		
 	def lista_nombres(self):
 		return [
 			"incendio_id",
 			"incendio_tam",
 			"incendio_inicio",
 			"incendio_fin",
+			"incendio_centro_lat",
+			"incendio_centro_lon",
 			"perimetro"
 		]
 	def lista(self):
+		self.promediar_latlons()
 		return [
 			self.id,
 			self.tam,
 			self.inicio,
 			self.fin,
+			self.prom_lat,
+			self.prom_lon,
 			self._calcular_perimetro()
 		]
 class Foco:
@@ -170,13 +185,14 @@ class Difusion:
 			for j in xrange(i,len(focos_hoy)):
 				if focos_hoy[i].es_ady(focos_hoy[j]):
 					self.uf_fuegos.union(focos_hoy[i].id,focos_hoy[j].id)
-
 	def calc_estadisticas(self):
 		for foco in self.focos:
 			if foco.id != foco.grupo.id:
 				foco.grupo.tam+=1
 				foco.grupo.posiciones.append(foco.obtener_pos())
+			foco.grupo.lista_latlon.append((foco.lat,foco.lon))
 			foco.grupo.fin=foco.fecha
+
 	def correr(self):
 		if len(self.dias) == 0: self._cargar_estructuras()
 		i=1;n=len(self.dias);prev=self.dias[0]
