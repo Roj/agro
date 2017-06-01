@@ -35,6 +35,7 @@ def haversine(lat1,lon1,lat2,lon2):
 #incendio es un grupo de focos,
 #pero la referencia es en sentido foco->incendio
 #i.e., cada foco sabe a que incendio pertenece.
+#el incendio tiene estadisticas sobre si mismo, that's all
 class Incendio:
 	def __init__(self,g_id,fecha,poss):
 		self.id = g_id
@@ -47,7 +48,11 @@ class Incendio:
 		self.lista_latlon=list()
 		self.prom_lat = -1
 		self.prom_lon = -1
-	
+	#wrapper para haversine, pero en otro formato
+	def _dist(self, origen, destino):
+		#punto[lon,lat] -> haversine(lat,lon)
+		return haversine(origen[1],origen[0],destino[1],destino[0])
+
 	def _calcular_perimetro(self):
 		#calcula el perimetro a traves del casco convexo de los puntos.
 		#actualmente perimetro = sum(dist(centroides)), no tiene en cuenta los bordes de las celdas.
@@ -63,7 +68,7 @@ class Incendio:
 		#caso trivial: no hay suficientes puntos
 		if len(self.posiciones) < 3:
 			for i in xrange(1,puntos.shape[0]):
-				perimetro += np.linalg.norm(puntos[i]-puntos[i-1])
+				perimetro += self._dist(puntos[i],puntos[i-1])
 			self._cache_perimetro = perimetro
 			self._cache_perim_n = len(self.posiciones)
 			return perimetro
@@ -72,11 +77,11 @@ class Incendio:
 		hull = ConvexHull(puntos, qhull_options='QJ Pp')
 		#los vertices estan ordenados ya
 		for i in xrange(1, hull.vertices.shape[0]):
-			perimetro+= np.linalg.norm(puntos[hull.vertices[i]]-puntos[hull.vertices[i-1]])
+			perimetro+= self._dist(puntos[hull.vertices[i]],puntos[hull.vertices[i-1]])
 		#wrap-around
-		perimetro+=np.linalg.norm(
-			puntos[hull.vertices[hull.vertices.shape[0]-1]]
-			- puntos[hull.vertices[0]]
+		perimetro+=self._dist(
+			puntos[hull.vertices[hull.vertices.shape[0]-1]],
+			puntos[hull.vertices[0]]
 		)
 		self._cache_perimetro = perimetro
 		self._cache_perim_n = len(self.posiciones)
@@ -97,10 +102,13 @@ class Incendio:
 			"incendio_fin",
 			"incendio_centro_lat",
 			"incendio_centro_lon",
-			"perimetro"
+			"perimetro",
+			"duracion",
+			"velocidad"
 		]
 	def lista(self):
 		self.promediar_latlons()
+		days = (self.fin-self.inicio).days+1
 		return [
 			self.id,
 			self.tam,
@@ -108,7 +116,9 @@ class Incendio:
 			self.fin,
 			self.prom_lat,
 			self.prom_lon,
-			self._calcular_perimetro()
+			self._calcular_perimetro(),
+			days,
+			self.tam/days
 		]
 class Foco:
 	def __init__(self,f_id,lat,lon,fecha):
@@ -181,6 +191,7 @@ class Difusion:
 					self.uf_fuegos.union(foco_hoy.id,foco_ayer.id)
 
 		#ahora apareo los del mismo dia; pero optimizando el ciclo
+		#(la optimizacion clasica de bubble sort)
 		for i in xrange(len(focos_hoy)):
 			for j in xrange(i,len(focos_hoy)):
 				if focos_hoy[i].es_ady(focos_hoy[j]):
@@ -191,7 +202,8 @@ class Difusion:
 				foco.grupo.tam+=1
 				foco.grupo.posiciones.append(foco.obtener_pos())
 			foco.grupo.lista_latlon.append((foco.lat,foco.lon))
-			foco.grupo.fin=foco.fecha
+			if foco.grupo.fin<foco.fecha:
+				foco.grupo.fin=foco.fecha
 
 	def correr(self):
 		if len(self.dias) == 0: self._cargar_estructuras()
