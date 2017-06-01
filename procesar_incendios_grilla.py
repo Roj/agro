@@ -56,7 +56,6 @@ if __name__ == "__main__":
 			(float(incendio["incendio_centro_lon"]),float(incendio["incendio_centro_lat"])),
 			cuadrados
 		)
-	print("got here!")
 	with open (AR_CSV_OUT, "w") as f:
 		writer = csv.DictWriter(f,fieldnames=sorted(incendios[0].keys()))
 		writer.writeheader()
