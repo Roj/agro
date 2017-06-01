@@ -67,7 +67,7 @@ class Incendio:
 
 		#caso trivial: no hay suficientes puntos
 		if len(self.posiciones) < 3:
-			for i in xrange(1,puntos.shape[0]):
+			for i in range(1,puntos.shape[0]):
 				perimetro += self._dist(puntos[i],puntos[i-1])
 			self._cache_perimetro = perimetro
 			self._cache_perim_n = len(self.posiciones)
@@ -76,7 +76,7 @@ class Incendio:
 		#Pp=no imprimir errores de precision
 		hull = ConvexHull(puntos, qhull_options='QJ Pp')
 		#los vertices estan ordenados ya
-		for i in xrange(1, hull.vertices.shape[0]):
+		for i in range(1, hull.vertices.shape[0]):
 			perimetro+= self._dist(puntos[hull.vertices[i]],puntos[hull.vertices[i-1]])
 		#wrap-around
 		perimetro+=self._dist(
@@ -171,13 +171,13 @@ class Difusion:
 		with open(ARCHIVO_FOCOS,"r") as f:
 			reader = csv.DictReader(f)
 			ar_focos = list(reader)
-		self.focos = map(crear_foco,ar_focos)
+		self.focos = list(map(crear_foco,ar_focos))
 	def cargar(self,focos):
 		self.focos = focos
 	def _cargar_estructuras(self):
 		self.uf_fuegos = UnionFind(len(self.focos))
 		for foco in self.focos:
-			if not self.dias.has_key(foco.fecha):
+			if foco.fecha not in self.dias:
 				self.dias[foco.fecha]=list()
 			#agrupo por dias
 			self.dias[foco.fecha].append(foco)
@@ -192,8 +192,8 @@ class Difusion:
 
 		#ahora apareo los del mismo dia; pero optimizando el ciclo
 		#(la optimizacion clasica de bubble sort)
-		for i in xrange(len(focos_hoy)):
-			for j in xrange(i,len(focos_hoy)):
+		for i in range(len(focos_hoy)):
+			for j in range(i,len(focos_hoy)):
 				if focos_hoy[i].es_ady(focos_hoy[j]):
 					self.uf_fuegos.union(focos_hoy[i].id,focos_hoy[j].id)
 	def calc_estadisticas(self):
@@ -207,7 +207,9 @@ class Difusion:
 
 	def correr(self):
 		if len(self.dias) == 0: self._cargar_estructuras()
-		i=1;n=len(self.dias);prev=self.dias[0]
+		i=1
+		n=len(self.dias)
+		prev=self.dias[0]
 		#la lista esta implementada internamente como un vector, por lo que el
 		#acceso al i-esimo elemento es O(1)
 		while i<n:

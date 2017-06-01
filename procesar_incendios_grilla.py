@@ -53,10 +53,10 @@ if __name__ == "__main__":
 
 	for incendio in incendios:
 		incendio["celda"]=celda_pert(
-			(incendio["incendio_centro_lon"],incendio["incendio_centro_lat"]),
+			(float(incendio["incendio_centro_lon"]),float(incendio["incendio_centro_lat"])),
 			cuadrados
 		)
-
+	print("got here!")
 	with open (AR_CSV_OUT, "w") as f:
 		writer = csv.DictWriter(f,fieldnames=sorted(incendios[0].keys()))
 		writer.writeheader()
