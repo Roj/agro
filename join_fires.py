@@ -121,8 +121,11 @@ class Incendio:
 			self.tam/days
 		]
 class Foco:
+	_uniqid = 0
 	def __init__(self,f_id,lat,lon,fecha):
-		self.id = f_id
+		self.id = Foco._uniqid
+		Foco._uniqid+=1
+		self.objectid = f_id
 		self.lat = lat
 		self.lon = lon
 		self.fecha = fecha
@@ -144,7 +147,7 @@ class Foco:
 		return nombres + self.grupo.lista_nombres()
 	def lista(self):
 		props = [
-			self.id,
+			self.objectid,
 			self.lat,
 			self.lon,
 			self.fecha
@@ -229,7 +232,6 @@ class Difusion:
 				writer.writerow(foco.lista())
 
 		
-#TODO: Disjointed sets
 if __name__ == "__main__":
 	app = Difusion()
 	app.cargar_de_archivo(ARCHIVO_FOCOS)
