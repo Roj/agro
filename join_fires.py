@@ -11,8 +11,15 @@ import sys, os
 
 #hay varios de la misma? => parece ser que no
 
-ARCHIVO_FOCOS = "datos/focos_recorte.csv"
+ARCHIVO_FOCOS = "datos/focos-pro.csv"
 ARCHIVO_SALIDA= "datos/focos_salida.csv"
+#excel: separador es ; punto decimal es ,
+#mundo racional: separador es , punto decimal es .
+SEPARADOR=";"
+PUNTO_DECIMAL=","
+#"%m/%d/%Y" focos_recorte.csv
+#excel => "%d/%m/%Y" 
+FORMATO_FECHA = "%d/%m/%Y" 
 CORTE_DIST_HAVERSINE=2
 
 #grados a radianes
@@ -153,11 +160,12 @@ class Foco:
 	
 
 def crear_foco(diccionario):
+    
 	return Foco(
 		int(diccionario["OBJECTID"]),
-		float(diccionario["LATITUDE"]),
-		float(diccionario["LONGITUDE"]),
-		datetime.datetime.strptime(diccionario["ACQ_DATE"],"%m/%d/%Y")
+		float(diccionario["LATITUDE"].replace(PUNTO_DECIMAL,".")),
+		float(diccionario["LONGITUDE"].replace(PUNTO_DECIMAL,".")),
+		datetime.datetime.strptime(diccionario["ACQ_DATE"],FORMATO_FECHA)
 	)
 
 class Difusion:
@@ -169,7 +177,7 @@ class Difusion:
 		self.dias = dict()
 	def cargar_de_archivo(self,ARCHIVO_FOCOS):
 		with open(ARCHIVO_FOCOS,"r") as f:
-			reader = csv.DictReader(f)
+			reader = csv.DictReader(f,delimiter=SEPARADOR)
 			ar_focos = list(reader)
 		self.focos = list(map(crear_foco,ar_focos))
 	def cargar(self,focos):
