@@ -12,6 +12,15 @@ promedios.head()
 del promedios['incendio_centro_lat']
 del promedios['incendio_centro_lon']
 del promedios['incendio_id']
+del promedios['bright']
+del promedios['bright_mean']
+del promedios['bright_sd']
+del promedios['frp']
+del promedios['frp_mean']
+del promedios['frp_sd']
+del promedios['conf']
+del promedios['conf_mean']
+del promedios['conf_sd']
 promedios.columns = ['duracion_prom','incendio_tam_prom', 'perimetro_prom', 'velocidad_prom']
 
 resultado = promedios

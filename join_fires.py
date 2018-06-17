@@ -6,20 +6,21 @@ from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
 import numpy as np
 from math import asin,sqrt,sin,cos,pi
+import statistics
 from UnionFind import UnionFind
 import sys, os
 
 #hay varios de la misma? => parece ser que no
 
-ARCHIVO_FOCOS = "datos/focos-pro.csv"
+ARCHIVO_FOCOS = "datos/focos_recorte.csv"
 ARCHIVO_SALIDA= "datos/focos_salida.csv"
 #excel: separador es ; punto decimal es ,
 #mundo racional: separador es , punto decimal es .
-SEPARADOR=";"
-PUNTO_DECIMAL=","
+SEPARADOR=","
+PUNTO_DECIMAL="."
 #"%m/%d/%Y" focos_recorte.csv
 #excel => "%d/%m/%Y" 
-FORMATO_FECHA = "%d/%m/%Y" 
+FORMATO_FECHA = "%m/%d/%Y" 
 CORTE_DIST_HAVERSINE=2
 
 #grados a radianes
@@ -44,7 +45,7 @@ def haversine(lat1,lon1,lat2,lon2):
 #i.e., cada foco sabe a que incendio pertenece.
 #el incendio tiene estadisticas sobre si mismo, that's all
 class Incendio:
-	def __init__(self,g_id,fecha,poss):
+	def __init__(self,g_id,fecha,poss, conf, bright, frp):
 		self.id = g_id
 		self.tam = 1
 		self.inicio = fecha
@@ -55,6 +56,10 @@ class Incendio:
 		self.lista_latlon=list()
 		self.prom_lat = -1
 		self.prom_lon = -1
+		self.estadisticas_calculadas = False
+		self.confs = [conf]
+		self.brights = [bright]
+		self.frps = [frp]
 	#wrapper para haversine, pero en otro formato
 	def _dist(self, origen, destino):
 		#punto[lon,lat] -> haversine(lat,lon)
@@ -94,6 +99,22 @@ class Incendio:
 		self._cache_perim_n = len(self.posiciones)
 		return perimetro
 
+	def calcular_estadisticas(self):
+		if self.estadisticas_calculadas:
+			return
+		self.estadisticas_calculadas = True
+
+		self.conf_mean = statistics.mean(self.confs)
+		self.bright_mean = statistics.mean(self.brights)
+		self.frp_mean = statistics.mean(self.frps)
+		if len(self.confs) == 1:
+			self.conf_sd = 0
+			self.bright_sd = 0
+			self.frp_sd = 0
+			return
+		self.conf_sd = statistics.stdev(self.confs)
+		self.bright_sd = statistics.stdev(self.brights)
+		self.frp_sd = statistics.stdev(self.frps)
 
 	def promediar_latlons(self):
 		if self.prom_lat == -1 and self.prom_lon == -1:
@@ -111,10 +132,17 @@ class Incendio:
 			"incendio_centro_lon",
 			"perimetro",
 			"duracion",
-			"velocidad"
+			"velocidad",
+			"conf_mean",
+			"conf_sd",
+			"bright_mean",
+			"bright_sd",
+			"frp_mean",
+			"frp_sd"
 		]
 	def lista(self):
 		self.promediar_latlons()
+		self.calcular_estadisticas()
 		days = (self.fin-self.inicio).days+1
 		return [
 			self.id,
@@ -125,18 +153,28 @@ class Incendio:
 			self.prom_lon,
 			self._calcular_perimetro(),
 			days,
-			self.tam/days
+			self.tam/days,
+			self.conf_mean,
+			self.conf_sd,
+			self.bright_mean,
+			self.bright_sd,
+			self.frp_mean,
+			self.frp_sd
 		]
 class Foco:
 	_uniqid = 0
-	def __init__(self,f_id,lat,lon,fecha):
+	def __init__(self,f_id,lat,lon,fecha, conf, bright, frp):
 		self.id = Foco._uniqid
 		Foco._uniqid+=1
 		self.objectid = f_id
 		self.lat = lat
 		self.lon = lon
 		self.fecha = fecha
-		self.grupo = Incendio(self.id,self.fecha, [self.obtener_pos()])
+		self.conf = conf
+		self.bright = bright
+		self.frp = frp
+		self.grupo = Incendio(self.id,self.fecha, [self.obtener_pos()],
+			self.conf, self.bright, self.frp)
 	def obtener_pos(self):
 		return [self.lon, self.lat]
 	def es_ady(self,otro,corte=CORTE_DIST_HAVERSINE):
@@ -149,7 +187,10 @@ class Foco:
 			"object_id",
 			"latitude",
 			"longitude",
-			"fecha"
+			"fecha",
+			"conf",
+			"bright",
+			"frp"
 		]
 		return nombres + self.grupo.lista_nombres()
 	def lista(self):
@@ -157,7 +198,10 @@ class Foco:
 			self.objectid,
 			self.lat,
 			self.lon,
-			self.fecha
+			self.fecha,
+			self.conf,
+			self.bright,
+			self.frp
 		]
 		return props + self.grupo.lista()
 	
@@ -168,16 +212,22 @@ def crear_foco(diccionario):
 		int(diccionario["OBJECTID"]),
 		float(diccionario["LATITUDE"].replace(PUNTO_DECIMAL,".")),
 		float(diccionario["LONGITUDE"].replace(PUNTO_DECIMAL,".")),
-		datetime.datetime.strptime(diccionario["ACQ_DATE"],FORMATO_FECHA)
+		datetime.datetime.strptime(diccionario["ACQ_DATE"],FORMATO_FECHA),
+		#float(diccionario["CONFIDENCE"].replace(PUNTO_DECIMAL,".")),
+                3,
+		float(diccionario["BRIGHT_T31"].replace(PUNTO_DECIMAL,".")),
+		float(diccionario["FRP"].replace(PUNTO_DECIMAL,"."))
 	)
 
 class Difusion:
-	def __init__(self):
+	def __init__(self, callback):
 		self.focos = None
 		#Union-find/DisjSet de fuegos
 		self.uf_fuegos = None
 		#Lista de dias con listas de incendios
 		self.dias = dict()
+		#Wrapper para no tener que hacer if callback != None: callback(..)
+		self.callback = lambda x: callback(x) if callback is not None else 0
 	def cargar_de_archivo(self,ARCHIVO_FOCOS):
 		with open(ARCHIVO_FOCOS,"r") as f:
 			reader = csv.DictReader(f,delimiter=SEPARADOR)
@@ -212,6 +262,9 @@ class Difusion:
 			if foco.id != foco.grupo.id:
 				foco.grupo.tam+=1
 				foco.grupo.posiciones.append(foco.obtener_pos())
+				foco.grupo.brights.append(foco.bright)
+				foco.grupo.frps.append(foco.frp)
+				foco.grupo.confs.append(foco.conf)
 			foco.grupo.lista_latlon.append((foco.lat,foco.lon))
 			if foco.grupo.fin<foco.fecha:
 				foco.grupo.fin=foco.fecha
@@ -223,25 +276,42 @@ class Difusion:
 		prev=self.dias[0]
 		#la lista esta implementada internamente como un vector, por lo que el
 		#acceso al i-esimo elemento es O(1)
+		last_print = 0
 		while i<n:
 			self.union_fire(prev,self.dias[i])
 			prev = self.dias[i]
 			i+=1	
+			if last_print + n/100 < i:
+				print("\rAvanzando.. "+str(i/n*100)+"%"+" "*20, end="")
+				#We scale to 70 instead of 100 to leave space for
+				#other steps of the algorithm.
+				self.callback(i/n * 68)
+				last_print = i
+		print("")
 		#ahora le asigno a cada foco su incendio
+		print("Asignando focos..")
 		for foco in self.focos:
 			foco.grupo=self.focos[self.uf_fuegos[foco.id]].grupo
-
+		self.callback(80)
+		print("Calculando estadisticas..")
 		self.calc_estadisticas()
+		self.callback(90)
+		print("OK!")
 	def guardar_en_archivo(self, ARCHIVO_SALIDA):
 		with open(ARCHIVO_SALIDA,"w") as f:
 			writer = csv.writer(f)
 			writer.writerow(self.focos[0].lista_nombres())
 			for foco in self.focos:
 				writer.writerow(foco.lista())
-
+		self.callback(100)
+	def __del__(self):
+		del(self.uf_fuegos)
 		
 if __name__ == "__main__":
-	app = Difusion()
+	app = Difusion(None)
+	print("Cargando de archivo")
 	app.cargar_de_archivo(ARCHIVO_FOCOS)
+	print("..OK")
 	app.correr()
+	print("Guardando en archivo")
 	app.guardar_en_archivo(ARCHIVO_SALIDA)
