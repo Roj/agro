@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 #
 import sys
+import time
 import os
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
-
+import join_fires
+import merge_incendios
+import procesar_incendios_grilla
+import fire_phenology
 class QProgBar(QProgressBar):
  
     value = 0
@@ -34,6 +38,7 @@ class GUI:
         self.addFirstStageBlock()
         self.addSecondStageBlock()
         self.addThirdStageBlock()
+        self.addFourthStageBlock()
 
     def addIntroBlock(self):
         label = QLabel("Detectar eventos de incendio")
@@ -77,9 +82,10 @@ class GUI:
         separador_label = QLabel("Separador:")
         separador_radio_1 = QRadioButton(";")
         separador_radio_2 = QRadioButton(",")
-        #separador_radio_group = QButtonGroup()
-        #separador_radio_group.addButton(separador_radio_1)
-        #separador_radio_group.addButton(separador_radio_2)
+        separador_radio_group = QButtonGroup()
+        separador_radio_group.addButton(separador_radio_1,1)
+        separador_radio_group.addButton(separador_radio_2,2)
+        separador_radio_group.setExclusive(False)
         firstStageLayout.addWidget(separador_label,3,0)
         firstStageLayout.addWidget(separador_radio_1,3,1)
         firstStageLayout.addWidget(separador_radio_2,3,2)
@@ -87,16 +93,45 @@ class GUI:
         pdecimal_label = QLabel("Punto decimal:")
         pdecimal_radio_1 = QRadioButton(",")
         pdecimal_radio_2 = QRadioButton(".")
-        #pdecimal_radio_group = QButtonGroup()
-        #pdecimal_radio_group.addButton(pdecimal_radio_1)
-        #pdecimal_radio_group.addButton(pdecimal_radio_2)
+        pdecimal_radio_group = QButtonGroup()
+        pdecimal_radio_group.addButton(pdecimal_radio_1,1)
+        pdecimal_radio_group.addButton(pdecimal_radio_2,2)
+        pdecimal_radio_group.setExclusive(True)
         firstStageLayout.addWidget(pdecimal_label,4,0)
         firstStageLayout.addWidget(pdecimal_radio_1,4,1)
         firstStageLayout.addWidget(pdecimal_radio_2,4,2)
 
+        bar = QProgBar()
+        self.bar_inserted = False
         def procesar_join_fires():
-            bar = QProgBar()
-            self.macrolayout.insertWidget(3,bar)
+            if not self.bar_inserted:
+                self.macrolayout.insertWidget(3,bar)
+                self.bar_inserted = True
+            bar.setValue(0)
+            print(pdecimal_radio_group.checkedId())
+            print(separador_radio_group.checkedId())
+            def actualizar_barra(porc):
+                bar.setValue(porc)
+                self.a.processEvents()
+            print("Archivo entrada = " + textbox.text())
+            print("Formato de fecha = " + formato_fecha_box.text())
+            pdecimal = "."
+            if pdecimal_radio_group.checkedId() == 1:
+                pdecimal = ","
+
+            separador = ","
+            if separador_radio_group.checkedId() == 1:
+                separador = ";"
+
+            print("pdecimal = " + pdecimal + " sep = " + separador)
+            join_fires.SEPARADOR = separador
+            join_fires.PUNTO_DECIMAL = pdecimal
+            join_fires.FORMATO_FECHA = formato_fecha_box.text()
+            app = join_fires.Difusion(actualizar_barra)
+            app.cargar_de_archivo(textbox.text())
+            app.correr()
+            app.guardar_en_archivo(join_fires.ARCHIVO_SALIDA)
+            del(app)
 
             
         procesar_1 = QPushButton('Procesar')
@@ -109,16 +144,18 @@ class GUI:
         self.macrolayout.addLayout(secondStageLayout)
 
         def procesar_agrupar():
-            bar = QProgBar()
             # It may look like it should be 5, but after a bar
             # is inserted in the first stage it shuold be 6.
-            self.macrolayout.insertWidget(6,bar)
+            self.macrolayout.insertWidget(6, QLabel("Agrupando.."))
+            merge_incendios.merge_incendios()
+            self.macrolayout.insertWidget(7, QLabel("OK!"))
+
 
         secondStageTitle = QLabel("Agrupar focos de incendio")
         secondStageTitle.setAlignment(Qt.AlignCenter)
         secondStageFileOut = QLabel(
             "Archivo de salida:"
-            + os.getcwd() + "/datos/focos_salida_agrupados.csv"
+            + os.getcwd() + "/" + merge_incendios.DEFAULT_FILENAME_OUT
         )
         secondStageFileOut.setAlignment(Qt.AlignLeft)
         secondStageButton = QPushButton("Procesar")
@@ -130,24 +167,46 @@ class GUI:
         thirdStageLayout = QGridLayout()
         self.macrolayout.addLayout(thirdStageLayout)
 
-        def procesar_agrupar():
-            bar = QProgBar()
-            self.macrolayout.addWidget(bar)
+        def procesar_asignar_celdas():
+            self.macrolayout.insertWidget(9,QLabel("Asignando.."))
+            procesar_incendios_grilla.asignar_grilla()
+            self.macrolayout.insertWidget(10,QLabel("OK!"))
 
         thirdStageTitle = QLabel("Asignar celdas de grillas")
         thirdStageTitle.setAlignment(Qt.AlignCenter)
         thirdStageFileOut = QLabel(
             "Archivo de salida:"
-            + os.getcwd() + "/datos/incendios_con_celdas.csv"
+            + os.getcwd() + "/"+procesar_incendios_grilla.AR_CSV_OUT
         )
         thirdStageFileOut.setAlignment(Qt.AlignLeft)
         thirdStageButton = QPushButton("Procesar")
-        thirdStageButton.clicked.connect(procesar_agrupar)
+        thirdStageButton.clicked.connect(procesar_asignar_celdas)
         thirdStageLayout.addWidget(thirdStageTitle)
         thirdStageLayout.addWidget(thirdStageFileOut)
         thirdStageLayout.addWidget(thirdStageButton)
 
+    def addFourthStageBlock(self):
+        fourthStageLayout = QGridLayout()
+        self.macrolayout.addLayout(fourthStageLayout)
 
+        def procesar_phenology():
+            self.macrolayout.addWidget(QLabel("Analizando.."))
+            fire_phenology.analizar_fenologia()
+            self.macrolayout.addWidget(QLabel("OK!"))
+
+        fourthStageTitle = QLabel("Analizar fenologia")
+        fourthStageTitle.setAlignment(Qt.AlignCenter)
+        fourthStageFileOut = QLabel(
+            "Archivo de salida:"
+            + os.getcwd() + "/"+fire_phenology.AR_OUT_ANUAL + "\n y "
+            + os.getcwd() + "/"+fire_phenology.AR_OUT_MENSUAL
+        )
+        fourthStageFileOut.setAlignment(Qt.AlignLeft)
+        fourthStageButton = QPushButton("Procesar")
+        fourthStageButton.clicked.connect(procesar_phenology)
+        fourthStageLayout.addWidget(fourthStageTitle)
+        fourthStageLayout.addWidget(fourthStageFileOut)
+        fourthStageLayout.addWidget(fourthStageButton)
     def run(self):
         
         self.window.show()
