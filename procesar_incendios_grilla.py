@@ -41,27 +41,32 @@ def celda_pert(punto, cuadrados):
     if i==n: return -1 #no se encontro cuadrado
     return i
 
-def asignar_grilla():
+def asignar_grilla(callback = None):
+    _callback = lambda x: callback(x) if callback is not None else 0
     grilla = shapefile.Reader(AR_GRILLA)
     cuadrados = [ordenar_vertices(s.points) for s in grilla.shapes()]
     with open(AR_CSV,"r") as f:
             reader = csv.DictReader(f)
             incendios = list(reader)
-
+    i = 0
+    n = len(incendios)
     for incendio in incendios:
             incendio["celda"]=celda_pert(
                     (float(incendio["incendio_centro_lon"]),float(incendio["incendio_centro_lat"])),
                     cuadrados
             )
+            if i % 1000 == 0:
+                _callback(min(i/n*100, 95))
+            i += 1
     with open (AR_CSV_OUT, "w") as f:
             writer = csv.DictWriter(f,fieldnames=sorted(incendios[0].keys()))
             writer.writeheader()
             writer.writerows(incendios)
+    _callback(100)
     del grilla
     del cuadrados
     del incendios
 
-	
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ class QProgBar(QProgressBar):
 
 class GUI:
     def __init__(self):
+        QApplication.setStyle(QStyleFactory.create('CleanLooks'))
         # Create an PyQT4 application object.
         self.a = QApplication(sys.argv)
          
@@ -166,11 +167,17 @@ class GUI:
     def addThirdStageBlock(self):
         thirdStageLayout = QGridLayout()
         self.macrolayout.addLayout(thirdStageLayout)
-
+        bar = QProgBar()
+        self.grid_bar_inserted = False
         def procesar_asignar_celdas():
-            self.macrolayout.insertWidget(9,QLabel("Asignando.."))
-            procesar_incendios_grilla.asignar_grilla()
-            self.macrolayout.insertWidget(10,QLabel("OK!"))
+            if not self.grid_bar_inserted:
+                self.macrolayout.insertWidget(9, bar)
+            bar.setValue(0)
+            def actualizar_barra(porc):
+                bar.setValue(porc)
+                self.a.processEvents()
+
+            procesar_incendios_grilla.asignar_grilla(actualizar_barra)
 
         thirdStageTitle = QLabel("Asignar celdas de grillas")
         thirdStageTitle.setAlignment(Qt.AlignCenter)
