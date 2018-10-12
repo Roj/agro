@@ -27,7 +27,7 @@ de Python a utilizar sea mayor a la 3.3.
 Es muy posible que el paquete `shapefile` no venga con estas suites, en ese caso
 es necesario correr en una consola el siguiente comando:   
 ```
-pip install shapefile
+pip install pyshp
 ```
 
 Para el análisis de la geometría de los eventos de incendio, es necesario tener
