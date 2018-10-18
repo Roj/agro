@@ -36,7 +36,7 @@ instalado R y el paquete 'ashape'. R se puede bajar desde la
 cliente se puede ejecutar el siguiente comando:   
 
 ```
-install.packages('ashape')
+install.packages('aspace')
 ```
 y, luego de seleccionar los mirrors (conviene elegir el más cercano, como el de
 la UNLP), el paquete se instala.
