@@ -85,7 +85,8 @@ interna de los datos, invariante a la entrada.
 Para esto, simplemente es necesario abrir el script que se quiere ejecutar y
 correrlo según especifica el IDE. En muchos, la tecla F5 se encarga de esto. Se
 aplica la misma nota sobre el primer script de `join_fires.py` 
-que está escrita en el apartado anterior.
+que está escrita en el apartado anterior.  
+
 ### Desde la interfaz     
 Hay una interfaz en desarrollo que haría un poco más sencillo manejar el flujo.
 Todavía tiene algunos problemas, pero también es útil. Visualmente, además
