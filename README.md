@@ -31,7 +31,7 @@ pip install pyshp
 ```
 
 Para el análisis de la geometría de los eventos de incendio, es necesario tener
-instalado R y el paquete 'ashape'. R se puede bajar desde la
+instalado R y el paquete 'aspace'. R se puede bajar desde la
 [página](https://www.r-project.org/) del proyecto. Una vez instalado, en el
 cliente se puede ejecutar el siguiente comando:   
 
